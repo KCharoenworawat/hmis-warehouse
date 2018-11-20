@@ -574,7 +574,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
         disabling_condition: ['Client ID', 'First Name', 'Last Name', 'Disability Type', 'Disability Response'],
         residence_prior: ['Client ID', 'First Name', 'Last Name', 'Prior Residence'],
         destination: ['Client ID', 'First Name', 'Last Name', 'Destination'],
-        # last_permanent_zip: ['Client ID', 'First Name', 'Last Name', 'Last Permanent Zip'],
+        move_in_date: ['Client ID', 'First Name', 'Last Name', 'Move-In-Date'],
       }
     end
 
@@ -1166,6 +1166,7 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       refused_disabling_condition = Set.new
       refused_prior_living = Set.new
       refused_destination = Set.new
+      missing_move_in_date = Set.new
       enrollments.each do |client_id, enrollments|
         enrollments.each do |enrollment|
           missing_disabling_condition << enrollment[:destination_id] if missing?(enrollment[:disabling_condition])
@@ -1178,6 +1179,10 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
         enrollments[client_id].each do |enrollment|
           missing_destination << enrollment[:destination_id] if missing?(enrollment[:destination])
           refused_destination << enrollment[:destination_id] if refused?(enrollment[:destination])
+          # Add missing move-in date only if the enrollment has an exit and is in ProjectTypes: 3, 9, 10, 13
+          if [3, 9, 10, 13].include?(enrollment[:project_type].to_i)
+            missing_move_in_date << enrollment[:destination_id] if date_missing?(enrollment[:move_in_date])
+          end
         end
       end
 
@@ -1190,9 +1195,11 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
       if leavers.count == 0
         missing_destination_percentage = 0
         refused_destination_percentage = 0
+        missing_move_in_date_percentage = 0
       else
         missing_destination_percentage = (missing_destination.size.to_f/leavers_count*100).round(2) rescue 0
         refused_destination_percentage = (refused_destination.size.to_f/leavers_count*100).round(2) rescue 0
+        missing_move_in_date_percentage = (missing_move_in_date.size.to_f/leavers_count*100).round(2) rescue 0
       end
       answers = {
         missing_disabling_condition: missing_disabling_condition.size,
@@ -1207,6 +1214,8 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
         refused_prior_living_percentage: refused_prior_living_percentage,
         refused_destination: refused_destination.size,
         refused_destination_percentage: refused_destination_percentage,
+        missing_move_in_date: missing_move_in_date,
+        missing_move_in_date_percentage: missing_move_in_date_percentage,
       }
 
       support = {
@@ -1233,6 +1242,10 @@ module GrdaWarehouse::WarehouseReports::Project::DataQuality
         refused_destination: {
           headers: ['Client ID'],
           counts: refused_destination.map{|m| Array.wrap(m)}
+        },
+        missing_move_in_date: {
+          headers: ['Client ID'],
+          counts: missing_move_in_date.map{|m| Array.wrap(m)}
         },
       }
 
